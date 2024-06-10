@@ -98,6 +98,14 @@ export const CommonFilterRow = ({ data, filterName, filters, setFilters }) => {
     console.log(filters);
   };
 
+  const showToast = ({ message }) => {
+    Toast.show({
+      type: "success",
+      text1: message,
+      position: "bottom",
+    });
+  };
+
   return (
     <View style={styles.flexRowWrap}>
       {data &&

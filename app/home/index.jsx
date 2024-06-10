@@ -18,6 +18,7 @@ import ImageGrid from "./../../components/ImageGrid";
 import { debounce } from "lodash";
 import FiltersModal from "./../../components/filtersModal";
 import { ActivityIndicator } from "react-native";
+import { useRouter } from "expo-router";
 
 var page = 1;
 
@@ -30,12 +31,15 @@ const HomeScreen = () => {
   const searchInputRef = useRef(null);
   const [activeCategory, setActiveCategory] = useState();
   const modalRef = useRef(null);
+  const router = useRouter();
+  const scrollRef = useRef(null);
+  const [isEndReached, setIsEndReached] = useState(false);
 
   useEffect(() => {
     fetchImages();
   }, []);
 
-  const fetchImages = async (params = { page: 1 }, append = false) => {
+  const fetchImages = async (params = { page: 1 }, append = true) => {
     let res = await apiCall(params);
     if (res.success && res?.data?.hits) {
       if (append) {
@@ -85,14 +89,14 @@ const HomeScreen = () => {
   };
 
   const clearThisFilter = (filterName) => {
-    let filters = { ...filters };
-    delete filters[filterName];
-    setFilters({ ...filters });
+    let filterz = { ...filters };
+    delete filterz[filterName];
+    setFilters({ ...filterz });
     page = 1;
     setImages([]);
     let params = {
       page,
-      ...filters,
+      ...filterz,
     };
     if (activeCategory) params.category = activeCategory;
     if (search) params.q = search;
@@ -136,13 +140,45 @@ const HomeScreen = () => {
     searchInputRef?.current?.clear();
   };
 
+  const handleScroll = (event) => {
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const scrollViewHeight = event.nativeEvent.layoutMeasurement.height;
+    const scrollOffset = event.nativeEvent.contentOffset.y;
+    const bottomPosition = contentHeight - scrollViewHeight;
+
+    if (scrollOffset >= bottomPosition - 1) {
+      if (!isEndReached) {
+        setIsEndReached(true);
+        console.log("reached the bottom of scrollview");
+        // fetch more images
+        ++page;
+        let params = {
+          page,
+          ...filters,
+        };
+        if (activeCategory) params.category = activeCategory;
+        if (search) params.q = search;
+        fetchImages(params);
+      }
+    } else if (isEndReached) {
+      setIsEndReached(false);
+    }
+  };
+
+  const handleScrollUp = () => {
+    scrollRef?.current?.scrollTo({
+      y: 0,
+      animated: true,
+    });
+  };
+
   const handleTextDebounce = useCallback(debounce(handleSearch, 400), []);
 
   return (
     <View style={[styles.container, { paddingTop }]}>
       {/* header */}
       <View style={styles.header}>
-        <Pressable>
+        <Pressable onPress={handleScrollUp}>
           <Text style={styles.title}>Pixels</Text>
         </Pressable>
         <Pressable>
@@ -154,7 +190,12 @@ const HomeScreen = () => {
           />
         </Pressable>
       </View>
-      <ScrollView contentContainerStyle={{ gap: 15 }}>
+      <ScrollView
+        onScroll={handleScroll}
+        scrollEventThrottle={5} // how often scroll event will fire while scrolling (in ms)
+        contentContainerStyle={{ gap: 15 }}
+        ref={scrollRef}
+      >
         {/* search bar */}
         <View style={styles.searchBar}>
           <View style={styles.searchIcon}>
@@ -231,7 +272,9 @@ const HomeScreen = () => {
           </View>
         )}
         {/* images masonry grid */}
-        <View>{images.length > 0 && <ImageGrid images={images} />}</View>
+        <View>
+          {images.length > 0 && <ImageGrid images={images} router={router} />}
+        </View>
 
         {/* loading */}
         <View
